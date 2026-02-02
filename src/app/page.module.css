@@ -46,10 +46,15 @@
     0 20px 40px rgba(15, 23, 42, 0.15);
 }
 
+.legendBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .legend {
   display: flex;
   gap: 24px;
-  justify-content: center;
 }
 
 .legendItem {
@@ -65,4 +70,52 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
+}
+
+.recordButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #1e293b;
+  color: #cbd5e1;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.recordButton:hover {
+  background: #334155;
+}
+
+.recordButton.recordingActive {
+  background: #ef4444;
+  color: white;
+}
+
+.recordButton.recordingActive:hover {
+  background: #dc2626;
+}
+
+.recordDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: white;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
 }

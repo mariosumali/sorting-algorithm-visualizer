@@ -24,7 +24,6 @@ interface ControlPanelProps {
     onSpeedChange: (speed: number) => void;
     onAudioToggle: (enabled: boolean) => void;
     onColorChange: (color: string) => void;
-    onRecordToggle: () => void;
     state: 'idle' | 'running' | 'paused' | 'complete';
     metrics: {
         comparisons: number;
@@ -32,7 +31,6 @@ interface ControlPanelProps {
     };
     audioEnabled: boolean;
     barColor: string;
-    isRecording: boolean;
 }
 
 export function ControlPanel({
@@ -44,12 +42,10 @@ export function ControlPanel({
     onSpeedChange,
     onAudioToggle,
     onColorChange,
-    onRecordToggle,
     state,
     metrics,
     audioEnabled,
     barColor,
-    isRecording,
 }: ControlPanelProps) {
     const [algorithm, setAlgorithm] = useState('Quick Sort');
     const [dataType, setDataType] = useState<DataGeneratorType>('random');
@@ -272,21 +268,7 @@ export function ControlPanel({
                 </div>
             </div>
 
-            {/* Record Toggle */}
-            <div className={styles.group}>
-                <div className={styles.toggleRow}>
-                    <label className={styles.label}>
-                        Record
-                        {isRecording && <span className={styles.recordIndicator} />}
-                    </label>
-                    <button
-                        className={`${styles.toggleButton} ${isRecording ? styles.toggleOn : ''} ${isRecording ? styles.recordingActive : ''}`}
-                        onClick={onRecordToggle}
-                    >
-                        <span className={styles.toggleKnob} />
-                    </button>
-                </div>
-            </div>
+
 
             {/* Controls */}
             <div className={styles.controls}>

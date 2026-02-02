@@ -85,6 +85,14 @@ export default function Home() {
     }
   }, []);
 
+  const handleRecordClick = useCallback(() => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  }, [isRecording, startRecording, stopRecording]);
+
   const runVerificationSweep = useCallback(() => {
     const arr = arrayRef.current;
     const audio = audioRef.current;
@@ -100,16 +108,12 @@ export default function Home() {
         // Sweep complete
         setTimeout(() => {
           setVerifiedIndex(-1);
-          // Auto-stop recording after verification sweep
-          if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-            setTimeout(stopRecording, 500);
-          }
         }, 500);
       }
     };
 
     sweep();
-  }, [stopRecording]);
+  }, []);
 
   const handleEvent = useCallback((event: SortEvent) => {
     const audio = audioRef.current;
@@ -225,9 +229,7 @@ export default function Home() {
       pivot: new Set(),
       range: null,
     });
-    // Stop recording if active
-    stopRecording();
-  }, [stopRecording]);
+  }, []);
 
   const handleSpeedChange = useCallback((speed: number) => {
     controllerRef.current?.setSpeed(speed);
@@ -245,14 +247,6 @@ export default function Home() {
     setBarColor(color);
   }, []);
 
-  const handleRecordToggle = useCallback(() => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
-    }
-  }, [isRecording, startRecording, stopRecording]);
-
   return (
     <main className={styles.main}>
       <div className={styles.container}>
@@ -269,15 +263,36 @@ export default function Home() {
             />
           </div>
 
-          <div className={styles.legend}>
-            <span className={styles.legendItem}>
-              <span className={styles.dot} style={{ background: '#3b82f6' }} />
-              Compare
-            </span>
-            <span className={styles.legendItem}>
-              <span className={styles.dot} style={{ background: '#ef4444' }} />
-              Swap
-            </span>
+          <div className={styles.legendBar}>
+            <div className={styles.legend}>
+              <span className={styles.legendItem}>
+                <span className={styles.dot} style={{ background: '#3b82f6' }} />
+                Compare
+              </span>
+              <span className={styles.legendItem}>
+                <span className={styles.dot} style={{ background: '#ef4444' }} />
+                Swap
+              </span>
+            </div>
+
+            <button
+              className={`${styles.recordButton} ${isRecording ? styles.recordingActive : ''}`}
+              onClick={handleRecordClick}
+            >
+              {isRecording ? (
+                <>
+                  <span className={styles.recordDot} />
+                  Stop Recording
+                </>
+              ) : (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="12" r="8" />
+                  </svg>
+                  Record
+                </>
+              )}
+            </button>
           </div>
         </div>
 
@@ -290,12 +305,10 @@ export default function Home() {
           onSpeedChange={handleSpeedChange}
           onAudioToggle={handleAudioToggle}
           onColorChange={handleColorChange}
-          onRecordToggle={handleRecordToggle}
           state={state}
           metrics={metrics}
           audioEnabled={audioEnabled}
           barColor={barColor}
-          isRecording={isRecording}
         />
       </div>
     </main>
