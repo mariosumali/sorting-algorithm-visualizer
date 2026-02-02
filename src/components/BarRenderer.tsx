@@ -43,9 +43,56 @@ export const BarRenderer = forwardRef<BarRendererHandle, BarRendererProps>(({
         if (!ctx) return;
 
         const dpr = window.devicePixelRatio || 1;
-        canvas.width = width * dpr;
-        canvas.height = height * dpr;
-        ctx.scale(dpr, dpr);
+        const targetWidth = width * dpr;
+        const targetHeight = height * dpr;
+
+        // Only resize if dimensions changed to avoid clearing the canvas
+        if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
+            ctx.scale(dpr, dpr);
+        } else {
+            // If we didn't resize (which clears), we need to manually clear
+            // Note: context state (scale) is preserved if we don't resize? 
+            // Actually, resizing resets the context state (including scale).
+            // If we don't resize, the previous scale is still active?
+            // No, it's safer to always reset transform if we are not sure, 
+            // but if we don't resize, we retain the context state.
+            // However, let's just make sure we clear correctly.
+            // Wait, if we DON'T resize, the scale is preserved from the last time we DID resize or set it.
+            // BUT, safely, we should probably just clear the rect.
+            // Actually, `ctx.scale` is likely cumulative if not reset, but here we are in a draw loop.
+            // Standard practice: if not resizing, just clear.
+            // But wait, if page reloads or something? 
+            // Let's assume the context state is persistent if we don't resize.
+            // Actually, let's just ensure scale is correct. 
+            // If we don't resize, we don't need to re-call scale IF it persists. 
+            // To be debugging-safe, maybe we should save/restore or setTransform?
+            // Let's stick to the minimal change: check size.
+            // If size matches, we still need to clear for the new frame.
+        }
+
+        // Re-applying scale might be needed if we assume state is lost or we want to be safe,
+        // but resizing definitely resets state.
+        // If we DON'T resize, state is KEPT.
+        // So we just need to clear.
+
+        // However, to be absolutely safe against state drift or external meddling:
+        // ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // This sets absolute scale
+
+        // Let's go with the resize check first.
+
+        if (Math.abs(canvas.width - targetWidth) > 1 || Math.abs(canvas.height - targetHeight) > 1) {
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
+            ctx.scale(dpr, dpr);
+        } else {
+            // Ensure we are working with a clean slate even without resize
+            // We can't easily check current transform without advanced APIs or tracking it.
+            // But since we control this canvas uniquely here, it should be fine.
+            // Let's just reset the transform to be sure.
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
 
         // Clear with dark background for recording
         ctx.fillStyle = '#0f172a';

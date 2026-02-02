@@ -28,6 +28,7 @@ export class AudioEngine {
     private minInterval: number;
     private masterGain: GainNode | null = null;
     private compressor: DynamicsCompressorNode | null = null;
+    private recordingDestination: MediaStreamAudioDestinationNode | null = null;
 
     constructor(config: Partial<AudioEngineConfig> = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
@@ -38,6 +39,9 @@ export class AudioEngine {
         if (this.ctx) return;
 
         this.ctx = new AudioContext();
+
+        // Create recording destination
+        this.recordingDestination = this.ctx.createMediaStreamDestination();
 
         // Create master chain: oscillators -> compressor -> gain -> destination
         this.compressor = this.ctx.createDynamicsCompressor();
@@ -52,6 +56,9 @@ export class AudioEngine {
 
         this.compressor.connect(this.masterGain);
         this.masterGain.connect(this.ctx.destination);
+
+        // Also connect to recording destination
+        this.masterGain.connect(this.recordingDestination);
     }
 
     async resume() {
@@ -59,6 +66,10 @@ export class AudioEngine {
         if (this.ctx?.state === 'suspended') {
             await this.ctx.resume();
         }
+    }
+
+    getAudioStream(): MediaStream | null {
+        return this.recordingDestination ? this.recordingDestination.stream : null;
     }
 
     private valueToFreq(value: number): number {
@@ -158,6 +169,7 @@ export class AudioEngine {
         this.ctx = null;
         this.masterGain = null;
         this.compressor = null;
+        this.recordingDestination = null;
     }
 }
 

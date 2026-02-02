@@ -51,14 +51,23 @@ export default function Home() {
     if (!canvas) return;
 
     chunksRef.current = [];
-    const stream = canvas.captureStream(60); // 60 fps
+    const videoStream = canvas.captureStream(60); // 60 fps
+
+    // Get audio stream
+    const audioStream = audioRef.current.getAudioStream();
+
+    // Combine tracks
+    const combinedStream = new MediaStream([
+      ...videoStream.getVideoTracks(),
+      ...(audioStream ? audioStream.getAudioTracks() : [])
+    ]);
 
     // Detect supported mime type
     const mimeTypes = [
-      'video/mp4;codecs=h264',
-      'video/mp4',
-      'video/webm;codecs=vp9',
-      'video/webm'
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm',
+      'video/mp4' // Fallback, might not support audio correctly in all browsers with MediaRecorder
     ];
 
     let selectedMimeType = 'video/webm';
@@ -69,9 +78,10 @@ export default function Home() {
       }
     }
 
-    const mediaRecorder = new MediaRecorder(stream, {
+    const mediaRecorder = new MediaRecorder(combinedStream, {
       mimeType: selectedMimeType,
-      videoBitsPerSecond: 5000000, // 5 Mbps
+      videoBitsPerSecond: 8000000, // 8 Mbps for high quality
+      audioBitsPerSecond: 128000,  // 128 kbps
     });
 
     mediaRecorder.ondataavailable = (e) => {
