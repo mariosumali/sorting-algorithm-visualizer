@@ -4,6 +4,8 @@
 
 A modern, high-performance sorting algorithm visualizer built with Next.js, TypeScript, and Web Audio API.
 
+**Created by Mario Sumali**
+
 ## Features
 
 - **Real-time Visualization**: Watch algorithms sort arrays of up to 999 elements in real-time.
@@ -60,6 +62,4 @@ A modern, high-performance sorting algorithm visualizer built with Next.js, Type
 - **Generator Functions**: Algorithms are implemented as generators, allowing for pausing, stepping, and speed control without blocking the UI.
 - **Canvas Rendering**: Optimized canvas renderer handles large datasets smoothly.
 
-## Credits
 
-Created by Mario Sumali.
