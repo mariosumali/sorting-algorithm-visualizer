@@ -85,6 +85,8 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  position: relative;
+  z-index: 10;
 }
 
 .recordButton:hover {
