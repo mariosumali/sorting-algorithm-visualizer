@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Sorting Algorithm Visualizer",
   description: "Watch sorting algorithms in action with real-time visualization and audio feedback",
+  icons: {
+    icon: '/vercel.svg',
+  },
 };
 
 export default function RootLayout({
