@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 
 interface BarRendererProps {
     array: number[];
@@ -17,15 +17,23 @@ interface BarRendererProps {
     height?: number;
 }
 
-export function BarRenderer({
+export interface BarRendererHandle {
+    getCanvas: () => HTMLCanvasElement | null;
+}
+
+export const BarRenderer = forwardRef<BarRendererHandle, BarRendererProps>(({
     array,
     highlights,
     barColor = '#cbd5e1',
     verifiedIndex = -1,
     width = 1000,
     height = 500
-}: BarRendererProps) {
+}, ref) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+
+    useImperativeHandle(ref, () => ({
+        getCanvas: () => canvasRef.current
+    }));
 
     const draw = useCallback(() => {
         const canvas = canvasRef.current;
@@ -39,8 +47,9 @@ export function BarRenderer({
         canvas.height = height * dpr;
         ctx.scale(dpr, dpr);
 
-        // Clear with transparent
-        ctx.clearRect(0, 0, width, height);
+        // Clear with dark background for recording
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, width, height);
 
         if (array.length === 0) return;
 
@@ -103,4 +112,6 @@ export function BarRenderer({
             }}
         />
     );
-}
+});
+
+BarRenderer.displayName = 'BarRenderer';

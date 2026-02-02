@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { BarRenderer } from '@/components/BarRenderer';
+import { BarRenderer, type BarRendererHandle } from '@/components/BarRenderer';
 import { ControlPanel } from '@/components/ControlPanel';
 import { createPlaybackController, type PlaybackState } from '@/lib/playback';
 import { dataGenerators, type DataGeneratorType } from '@/lib/generators';
@@ -15,6 +15,7 @@ export default function Home() {
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [barColor, setBarColor] = useState('#cbd5e1');
   const [verifiedIndex, setVerifiedIndex] = useState<number>(-1);
+  const [isRecording, setIsRecording] = useState(false);
   const [highlights, setHighlights] = useState({
     compare: new Set<number>(),
     swap: new Set<number>(),
@@ -30,6 +31,9 @@ export default function Home() {
   const controllerRef = useRef<ReturnType<typeof createPlaybackController> | null>(null);
   const arrayRef = useRef<number[]>([]);
   const audioRef = useRef(getAudioEngine());
+  const barRendererRef = useRef<BarRendererHandle>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
     const initialData = dataGenerators.random({ n: 100, seed: Date.now() });
@@ -40,6 +44,45 @@ export default function Home() {
       controllerRef.current?.destroy();
       audioRef.current.destroy();
     };
+  }, []);
+
+  const startRecording = useCallback(() => {
+    const canvas = barRendererRef.current?.getCanvas();
+    if (!canvas) return;
+
+    chunksRef.current = [];
+    const stream = canvas.captureStream(60); // 60 fps
+    const mediaRecorder = new MediaRecorder(stream, {
+      mimeType: 'video/webm;codecs=vp9',
+      videoBitsPerSecond: 5000000, // 5 Mbps for quality
+    });
+
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) {
+        chunksRef.current.push(e.data);
+      }
+    };
+
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `sorting-${Date.now()}.webm`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setIsRecording(false);
+    };
+
+    mediaRecorderRef.current = mediaRecorder;
+    mediaRecorder.start();
+    setIsRecording(true);
+  }, []);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
   }, []);
 
   const runVerificationSweep = useCallback(() => {
@@ -55,12 +98,18 @@ export default function Home() {
         setTimeout(sweep, 15); // Fast sweep
       } else {
         // Sweep complete
-        setTimeout(() => setVerifiedIndex(-1), 500);
+        setTimeout(() => {
+          setVerifiedIndex(-1);
+          // Auto-stop recording after verification sweep
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            setTimeout(stopRecording, 500);
+          }
+        }, 500);
       }
     };
 
     sweep();
-  }, []);
+  }, [stopRecording]);
 
   const handleEvent = useCallback((event: SortEvent) => {
     const audio = audioRef.current;
@@ -176,7 +225,9 @@ export default function Home() {
       pivot: new Set(),
       range: null,
     });
-  }, []);
+    // Stop recording if active
+    stopRecording();
+  }, [stopRecording]);
 
   const handleSpeedChange = useCallback((speed: number) => {
     controllerRef.current?.setSpeed(speed);
@@ -194,12 +245,21 @@ export default function Home() {
     setBarColor(color);
   }, []);
 
+  const handleRecordToggle = useCallback(() => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  }, [isRecording, startRecording, stopRecording]);
+
   return (
     <main className={styles.main}>
       <div className={styles.container}>
         <div className={styles.visualizerSection}>
           <div className={styles.canvas}>
             <BarRenderer
+              ref={barRendererRef}
               array={array}
               highlights={highlights}
               barColor={barColor}
@@ -230,10 +290,12 @@ export default function Home() {
           onSpeedChange={handleSpeedChange}
           onAudioToggle={handleAudioToggle}
           onColorChange={handleColorChange}
+          onRecordToggle={handleRecordToggle}
           state={state}
           metrics={metrics}
           audioEnabled={audioEnabled}
           barColor={barColor}
+          isRecording={isRecording}
         />
       </div>
     </main>
