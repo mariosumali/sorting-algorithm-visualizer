@@ -89,7 +89,9 @@ export default function Home() {
       const ext = selectedMimeType.includes('mp4') ? 'mp4' : 'webm';
       a.download = `sorting-${Date.now()}.${ext}`;
 
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
       setIsRecording(false);
     };
