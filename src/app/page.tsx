@@ -52,9 +52,26 @@ export default function Home() {
 
     chunksRef.current = [];
     const stream = canvas.captureStream(60); // 60 fps
+
+    // Detect supported mime type
+    const mimeTypes = [
+      'video/mp4;codecs=h264',
+      'video/mp4',
+      'video/webm;codecs=vp9',
+      'video/webm'
+    ];
+
+    let selectedMimeType = 'video/webm';
+    for (const type of mimeTypes) {
+      if (MediaRecorder.isTypeSupported(type)) {
+        selectedMimeType = type;
+        break;
+      }
+    }
+
     const mediaRecorder = new MediaRecorder(stream, {
-      mimeType: 'video/webm;codecs=vp9',
-      videoBitsPerSecond: 5000000, // 5 Mbps for quality
+      mimeType: selectedMimeType,
+      videoBitsPerSecond: 5000000, // 5 Mbps
     });
 
     mediaRecorder.ondataavailable = (e) => {
@@ -64,11 +81,14 @@ export default function Home() {
     };
 
     mediaRecorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+      const blob = new Blob(chunksRef.current, { type: selectedMimeType });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `sorting-${Date.now()}.webm`;
+
+      const ext = selectedMimeType.includes('mp4') ? 'mp4' : 'webm';
+      a.download = `sorting-${Date.now()}.${ext}`;
+
       a.click();
       URL.revokeObjectURL(url);
       setIsRecording(false);
