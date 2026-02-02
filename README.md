@@ -2,7 +2,9 @@
 
 ![Sorting Visualizer](/public/thumbnail.png)
 
-A modern, high-performance sorting algorithm visualizer built with Next.js, TypeScript, and Web Audio API.
+<video src="sorting-1770014194464.webm" controls width="100%"></video>
+
+A sorting algorithm visualizer built with Next.js, TypeScript, and Web Audio API.
 
 **Created by Mario Sumali**
 
