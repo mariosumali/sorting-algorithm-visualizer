@@ -1,8 +1,8 @@
 # Sorting Algorithm Visualizer
 
-![Sorting Visualizer](/public/thumbnail.png)
+[![Sorting Visualizer](public/thumbnail.png)](sorting-1770014194464.webm)
 
-<video src="sorting-1770014194464.webm" controls width="100%"></video>
+> **Note**: Click the image above to watch the demo video with sound.
 
 A sorting algorithm visualizer built with Next.js, TypeScript, and Web Audio API.
 
@@ -55,8 +55,6 @@ A sorting algorithm visualizer built with Next.js, TypeScript, and Web Audio API
    ```bash
    npm run dev
    ```
-
-4. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Architecture
 
