@@ -1,6 +1,7 @@
 'use client';
 
-import { useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
+import type { ThemeConfig } from '@/lib/themes';
 
 interface BarRendererProps {
     array: number[];
@@ -11,8 +12,9 @@ interface BarRendererProps {
         pivot: Set<number>;
         range: [number, number] | null;
     };
-    barColor?: string;
+    theme: ThemeConfig;
     verifiedIndex?: number;
+    deletedIndices: Set<number>;
     width?: number;
     height?: number;
 }
@@ -21,133 +23,246 @@ export interface BarRendererHandle {
     getCanvas: () => HTMLCanvasElement | null;
 }
 
+interface DyingBar {
+    value: number;
+    x: number;
+    w: number;
+    startTime: number;
+}
+
+const DEATH_DURATION_MS = 280;
+const LERP_FACTOR = 0.18;
+
 export const BarRenderer = forwardRef<BarRendererHandle, BarRendererProps>(({
     array,
     highlights,
-    barColor = '#cbd5e1',
+    theme,
     verifiedIndex = -1,
+    deletedIndices,
     width = 1000,
     height = 500
 }, ref) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const barXRef = useRef<Map<number, number>>(new Map());
+    const barWRef = useRef<Map<number, number>>(new Map());
+    const dyingBarsRef = useRef<Map<number, DyingBar>>(new Map());
+    const prevArrayRef = useRef<number[]>([]);
+    const prevDeletedRef = useRef<Set<number>>(new Set());
+    const rafRef = useRef<number>(0);
+
+    const latestProps = useRef({
+        array, highlights, theme, verifiedIndex, deletedIndices, width, height
+    });
+    latestProps.current = {
+        array, highlights, theme, verifiedIndex, deletedIndices, width, height
+    };
 
     useImperativeHandle(ref, () => ({
         getCanvas: () => canvasRef.current
     }));
 
-    const draw = useCallback(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
+    useEffect(() => {
+        const prev = prevArrayRef.current;
+        const curr = array;
+        const prevDel = prevDeletedRef.current;
 
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+        for (let i = 0; i < curr.length; i++) {
+            const wasAlive = i < prev.length && prev[i] > 0 && !prevDel.has(i);
+            const isDeleted = deletedIndices.has(i);
 
-        const dpr = window.devicePixelRatio || 1;
-        const targetWidth = width * dpr;
-        const targetHeight = height * dpr;
-
-        // Only resize if dimensions changed to avoid clearing the canvas
-        if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
-            canvas.width = targetWidth;
-            canvas.height = targetHeight;
-            ctx.scale(dpr, dpr);
-        } else {
-            // If we didn't resize (which clears), we need to manually clear
-            // Note: context state (scale) is preserved if we don't resize? 
-            // Actually, resizing resets the context state (including scale).
-            // If we don't resize, the previous scale is still active?
-            // No, it's safer to always reset transform if we are not sure, 
-            // but if we don't resize, we retain the context state.
-            // However, let's just make sure we clear correctly.
-            // Wait, if we DON'T resize, the scale is preserved from the last time we DID resize or set it.
-            // BUT, safely, we should probably just clear the rect.
-            // Actually, `ctx.scale` is likely cumulative if not reset, but here we are in a draw loop.
-            // Standard practice: if not resizing, just clear.
-            // But wait, if page reloads or something? 
-            // Let's assume the context state is persistent if we don't resize.
-            // Actually, let's just ensure scale is correct. 
-            // If we don't resize, we don't need to re-call scale IF it persists. 
-            // To be debugging-safe, maybe we should save/restore or setTransform?
-            // Let's stick to the minimal change: check size.
-            // If size matches, we still need to clear for the new frame.
-        }
-
-        // Re-applying scale might be needed if we assume state is lost or we want to be safe,
-        // but resizing definitely resets state.
-        // If we DON'T resize, state is KEPT.
-        // So we just need to clear.
-
-        // However, to be absolutely safe against state drift or external meddling:
-        // ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // This sets absolute scale
-
-        // Let's go with the resize check first.
-
-        if (Math.abs(canvas.width - targetWidth) > 1 || Math.abs(canvas.height - targetHeight) > 1) {
-            canvas.width = targetWidth;
-            canvas.height = targetHeight;
-            ctx.scale(dpr, dpr);
-        } else {
-            // Ensure we are working with a clean slate even without resize
-            // We can't easily check current transform without advanced APIs or tracking it.
-            // But since we control this canvas uniquely here, it should be fine.
-            // Let's just reset the transform to be sure.
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        }
-
-        // Clear with dark background for recording
-        ctx.fillStyle = '#0f172a';
-        ctx.fillRect(0, 0, width, height);
-
-        if (array.length === 0) return;
-
-        const n = array.length;
-        const padding = 16;
-        const availableWidth = width - padding * 2;
-        const barWidth = Math.max(1, availableWidth / n);
-        const maxHeight = height - padding * 2;
-        const gap = n > 200 ? 0 : n > 100 ? 0.5 : Math.min(1, barWidth * 0.1);
-
-        // Draw bars
-        for (let i = 0; i < n; i++) {
-            const value = array[i];
-            const barHeight = Math.max(1, value * maxHeight);
-            const x = padding + i * barWidth + gap / 2;
-            const y = height - padding - barHeight;
-            const w = Math.max(0.5, barWidth - gap);
-
-            // Determine color
-            let color = barColor;
-
-            // Verification sweep (green wave)
-            if (verifiedIndex >= 0 && i <= verifiedIndex) {
-                color = '#22c55e'; // Green for verified
-            } else if (highlights.pivot.has(i)) {
-                color = '#f97316'; // Orange
-            } else if (highlights.swap.has(i)) {
-                color = '#ef4444'; // Red
-            } else if (highlights.write.has(i)) {
-                color = '#22c55e'; // Green
-            } else if (highlights.compare.has(i)) {
-                color = '#3b82f6'; // Blue
-            }
-
-            ctx.fillStyle = color;
-
-            if (barWidth > 2) {
-                // Rounded corners for visible bars
-                const radius = Math.min(2, barWidth / 4);
-                ctx.beginPath();
-                ctx.roundRect(x, y, w, barHeight, [radius, radius, 0, 0]);
-                ctx.fill();
-            } else {
-                ctx.fillRect(x, y, w, barHeight);
+            if (wasAlive && isDeleted && !dyingBarsRef.current.has(i)) {
+                dyingBarsRef.current.set(i, {
+                    value: prev[i],
+                    x: barXRef.current.get(i) ?? 0,
+                    w: barWRef.current.get(i) ?? 0,
+                    startTime: performance.now(),
+                });
             }
         }
-    }, [array, highlights, barColor, verifiedIndex, width, height]);
+
+        prevArrayRef.current = [...curr];
+        prevDeletedRef.current = new Set(deletedIndices);
+    }, [array, deletedIndices]);
 
     useEffect(() => {
+        const prev = prevArrayRef.current;
+        const curr = latestProps.current.array;
+
+        for (let i = 0; i < curr.length; i++) {
+            if (curr[i] > 0 && (i >= prev.length || prev[i] === 0)) {
+                for (const delta of [-1, 1, -2, 2]) {
+                    const from = i + delta;
+                    if (
+                        from >= 0 && from < prev.length &&
+                        prev[from] > 0 && curr[from] === 0 &&
+                        barXRef.current.has(from)
+                    ) {
+                        barXRef.current.set(i, barXRef.current.get(from)!);
+                        barWRef.current.set(i, barWRef.current.get(from)!);
+                        barXRef.current.delete(from);
+                        barWRef.current.delete(from);
+                        break;
+                    }
+                }
+            }
+        }
+    }, [array]);
+
+    useEffect(() => {
+        let running = true;
+
+        function draw() {
+            if (!running) return;
+
+            const {
+                array: arr, highlights: hl, theme: th,
+                verifiedIndex: vi, deletedIndices: delSet,
+                width: w, height: h
+            } = latestProps.current;
+
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            const dpr = window.devicePixelRatio || 1;
+            const tW = w * dpr;
+            const tH = h * dpr;
+
+            if (canvas.width !== tW || canvas.height !== tH) {
+                canvas.width = tW;
+                canvas.height = tH;
+            }
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+            ctx.fillStyle = th.canvasBackground;
+            ctx.fillRect(0, 0, w, h);
+
+            if (arr.length === 0) return;
+
+            const livingIndices: number[] = [];
+            for (let i = 0; i < arr.length; i++) {
+                if (arr[i] > 0 && !delSet.has(i)) livingIndices.push(i);
+            }
+
+            const n = Math.max(1, livingIndices.length);
+            const padding = 16;
+            const availableWidth = w - padding * 2;
+            const barWidth = Math.max(1, availableWidth / n);
+            const maxHeight = h - padding * 2;
+            const gap = n > 200 ? 0 : n > 100 ? 0.5 : Math.min(1, barWidth * 0.1);
+
+            let stillAnimating = false;
+
+            for (let pos = 0; pos < livingIndices.length; pos++) {
+                const idx = livingIndices[pos];
+                const targetX = padding + pos * barWidth + gap / 2;
+                const targetW = Math.max(0.5, barWidth - gap);
+
+                let x: number, bw: number;
+                if (barXRef.current.has(idx)) {
+                    const prevX = barXRef.current.get(idx)!;
+                    const prevW = barWRef.current.get(idx)!;
+                    x = prevX + (targetX - prevX) * LERP_FACTOR;
+                    bw = prevW + (targetW - prevW) * LERP_FACTOR;
+                    if (Math.abs(x - targetX) > 0.3 || Math.abs(bw - targetW) > 0.2) {
+                        stillAnimating = true;
+                    } else {
+                        x = targetX;
+                        bw = targetW;
+                    }
+                } else {
+                    x = targetX;
+                    bw = targetW;
+                }
+
+                barXRef.current.set(idx, x);
+                barWRef.current.set(idx, bw);
+
+                const value = arr[idx];
+                const barHeight = Math.max(1, value * maxHeight);
+                const y = h - padding - barHeight;
+
+                let color = th.barColor;
+                if (vi >= 0 && idx <= vi) {
+                    color = th.verifiedColor;
+                } else if (hl.pivot.has(idx)) {
+                    color = th.pivotColor;
+                } else if (hl.swap.has(idx)) {
+                    color = th.swapColor;
+                } else if (hl.write.has(idx)) {
+                    color = th.writeColor;
+                } else if (hl.compare.has(idx)) {
+                    color = th.compareColor;
+                }
+
+                ctx.fillStyle = color;
+                if (bw > 2) {
+                    const radius = Math.min(2, bw / 4);
+                    ctx.beginPath();
+                    ctx.roundRect(x, y, bw, barHeight, [radius, radius, 0, 0]);
+                    ctx.fill();
+                } else {
+                    ctx.fillRect(x, y, bw, barHeight);
+                }
+            }
+
+            const now = performance.now();
+            const toRemove: number[] = [];
+
+            dyingBarsRef.current.forEach((bar, idx) => {
+                const elapsed = now - bar.startTime;
+                const progress = Math.min(1, elapsed / DEATH_DURATION_MS);
+
+                if (progress >= 1) {
+                    toRemove.push(idx);
+                    return;
+                }
+
+                stillAnimating = true;
+
+                const ease = 1 - Math.pow(1 - progress, 3);
+                const scale = 1 - ease;
+                const opacity = 1 - ease;
+
+                const barHeight = Math.max(0, bar.value * maxHeight * scale);
+                const y = h - padding - barHeight;
+
+                ctx.save();
+                ctx.globalAlpha = opacity;
+                ctx.fillStyle = '#ef4444';
+                if (bar.w > 2) {
+                    const radius = Math.min(2, bar.w / 4);
+                    ctx.beginPath();
+                    ctx.roundRect(bar.x, y, bar.w, barHeight, [radius, radius, 0, 0]);
+                    ctx.fill();
+                } else {
+                    ctx.fillRect(bar.x, y, bar.w, barHeight);
+                }
+                ctx.restore();
+            });
+
+            for (const idx of toRemove) {
+                dyingBarsRef.current.delete(idx);
+                barXRef.current.delete(idx);
+                barWRef.current.delete(idx);
+            }
+
+            if (stillAnimating) {
+                rafRef.current = requestAnimationFrame(draw);
+            }
+        }
+
         draw();
-    }, [draw]);
+        return () => {
+            running = false;
+            cancelAnimationFrame(rafRef.current);
+        };
+    }, [array, highlights, theme, verifiedIndex, deletedIndices, width, height]);
+
+    useEffect(() => {
+        return () => cancelAnimationFrame(rafRef.current);
+    }, []);
 
     return (
         <canvas
