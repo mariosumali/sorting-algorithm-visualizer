@@ -136,6 +136,21 @@ export function generatePipeOrgan(options: GeneratorOptions): number[] {
     return result;
 }
 
+/**
+ * Converts any pattern array into unique 1-N values while preserving the shape.
+ * Ranks the values and maps them to evenly spaced values in (0, 1].
+ */
+export function makeUnique(pattern: number[]): number[] {
+    const n = pattern.length;
+    const indexed = pattern.map((v, i) => ({ v, i }));
+    indexed.sort((a, b) => a.v - b.v || a.i - b.i);
+    const result = new Array(n);
+    indexed.forEach((item, rank) => {
+        result[item.i] = (rank + 1) / n;
+    });
+    return result;
+}
+
 export const dataGenerators: Record<DataGeneratorType, (opts: GeneratorOptions) => number[]> = {
     random: generateRandom,
     nearlySorted: (opts) => generateNearlySorted(opts, 5),
