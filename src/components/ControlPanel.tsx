@@ -1,37 +1,45 @@
 'use client';
 
 import { useState } from 'react';
-import { algorithms } from '@/lib/algorithms';
+import { algorithms, algorithmGroups } from '@/lib/algorithms';
 import { type DataGeneratorType } from '@/lib/generators';
+import { THEME_PRESETS, THEME_KEYS, type ThemeConfig } from '@/lib/themes';
 import styles from './ControlPanel.module.css';
 
-const COLOR_PRESETS = [
-    { name: 'Slate', value: '#cbd5e1' },
-    { name: 'Blue', value: '#60a5fa' },
-    { name: 'Purple', value: '#a78bfa' },
-    { name: 'Pink', value: '#f472b6' },
-    { name: 'Cyan', value: '#22d3d1' },
-    { name: 'Orange', value: '#fb923c' },
-    { name: 'White', value: '#ffffff' },
-];
-
 interface ControlPanelProps {
-    onStart: (algorithm: string, dataType: DataGeneratorType, n: number, seed: number) => void;
+    onStart: (algorithm: string, dataType: DataGeneratorType, n: number, seed: number, speed: number, uniqueValues: boolean) => void;
     onPause: () => void;
     onResume: () => void;
     onStep: () => void;
     onReset: () => void;
     onSpeedChange: (speed: number) => void;
     onAudioToggle: (enabled: boolean) => void;
-    onColorChange: (color: string) => void;
+    onThemeChange: (theme: ThemeConfig) => void;
+    onAlgorithmChange?: (algorithm: string) => void;
     state: 'idle' | 'running' | 'paused' | 'complete';
     metrics: {
         comparisons: number;
         swaps: number;
     };
     audioEnabled: boolean;
-    barColor: string;
+    theme: ThemeConfig;
 }
+
+type ThemeColorKey = keyof Pick<
+    ThemeConfig,
+    'canvasBackground' | 'pageBackground' | 'barColor' | 'compareColor' | 'swapColor' | 'writeColor' | 'pivotColor' | 'verifiedColor'
+>;
+
+const COLOR_FIELDS: { key: ThemeColorKey; label: string }[] = [
+    { key: 'pageBackground', label: 'Page' },
+    { key: 'canvasBackground', label: 'Canvas' },
+    { key: 'barColor', label: 'Bars' },
+    { key: 'compareColor', label: 'Compare' },
+    { key: 'swapColor', label: 'Swap' },
+    { key: 'writeColor', label: 'Write' },
+    { key: 'pivotColor', label: 'Pivot' },
+    { key: 'verifiedColor', label: 'Verified' },
+];
 
 export function ControlPanel({
     onStart,
@@ -41,40 +49,92 @@ export function ControlPanel({
     onReset,
     onSpeedChange,
     onAudioToggle,
-    onColorChange,
+    onThemeChange,
+    onAlgorithmChange,
     state,
     metrics,
     audioEnabled,
-    barColor,
+    theme,
 }: ControlPanelProps) {
     const [algorithm, setAlgorithm] = useState('Quick Sort');
     const [dataType, setDataType] = useState<DataGeneratorType>('random');
-    const [arraySize, setArraySize] = useState(100);
-    const [speed, setSpeed] = useState(200);
+    const [arraySize, setArraySize] = useState(15);
+    const [speed, setSpeed] = useState(10);
     const [seed, setSeed] = useState(Math.floor(Math.random() * 1000000));
+    const [uniqueValues, setUniqueValues] = useState(false);
 
-    // UI State
+    const [sizeText, setSizeText] = useState('15');
+    const [speedText, setSpeedText] = useState('10');
+    const [seedText, setSeedText] = useState(String(seed));
+
     const [isPanelOpen, setIsPanelOpen] = useState(true);
-    const [isColorCollapsed, setIsColorCollapsed] = useState(true);
+    const [isAppearanceCollapsed, setIsAppearanceCollapsed] = useState(true);
+    const [showColorDetails, setShowColorDetails] = useState(false);
 
     const handleStart = () => {
-        onStart(algorithm, dataType, arraySize, seed);
+        onStart(algorithm, dataType, arraySize, seed, speed, uniqueValues);
     };
 
-    const handleSpeedChange = (newSpeed: number) => {
+    const handleSpeedSlider = (newSpeed: number) => {
         setSpeed(newSpeed);
+        setSpeedText(String(newSpeed));
         onSpeedChange(newSpeed);
     };
 
-    const handleNewSeed = () => {
-        setSeed(Math.floor(Math.random() * 1000000));
+    const handleSpeedTextChange = (value: string) => {
+        setSpeedText(value);
+        const num = parseInt(value, 10);
+        if (!isNaN(num) && num >= 1 && num <= 1000) {
+            setSpeed(num);
+            onSpeedChange(num);
+        }
     };
 
-    const handleSizeInput = (value: string) => {
+    const handleSpeedTextBlur = () => {
+        setSpeedText(String(speed));
+    };
+
+    const handleSizeSlider = (value: number) => {
+        setArraySize(value);
+        setSizeText(String(value));
+    };
+
+    const handleSizeTextChange = (value: string) => {
+        setSizeText(value);
         const num = parseInt(value, 10);
-        if (!isNaN(num) && num >= 10 && num <= 999) {
+        if (!isNaN(num) && num >= 2 && num <= 999) {
             setArraySize(num);
         }
+    };
+
+    const handleSizeTextBlur = () => {
+        setSizeText(String(arraySize));
+    };
+
+    const handleSeedTextChange = (value: string) => {
+        setSeedText(value);
+        const num = parseInt(value, 10);
+        if (!isNaN(num)) {
+            setSeed(num);
+        }
+    };
+
+    const handleSeedTextBlur = () => {
+        setSeedText(String(seed));
+    };
+
+    const handleNewSeed = () => {
+        const newSeed = Math.floor(Math.random() * 1000000);
+        setSeed(newSeed);
+        setSeedText(String(newSeed));
+    };
+
+    const handleThemePreset = (key: string) => {
+        onThemeChange({ ...THEME_PRESETS[key] });
+    };
+
+    const handleColorField = (key: ThemeColorKey, value: string) => {
+        onThemeChange({ ...theme, [key]: value });
     };
 
     const isRunning = state === 'running';
@@ -117,11 +177,18 @@ export function ControlPanel({
                 <select
                     className={styles.select}
                     value={algorithm}
-                    onChange={(e) => setAlgorithm(e.target.value)}
+                    onChange={(e) => {
+                        setAlgorithm(e.target.value);
+                        onAlgorithmChange?.(e.target.value);
+                    }}
                     disabled={isRunning}
                 >
-                    {Object.keys(algorithms).map((name) => (
-                        <option key={name} value={name}>{name}</option>
+                    {algorithmGroups.map((group) => (
+                        <optgroup key={group.label} label={group.label}>
+                            {group.algorithms.filter(name => name in algorithms).map((name) => (
+                                <option key={name} value={name}>{name}</option>
+                            ))}
+                        </optgroup>
                     ))}
                 </select>
             </div>
@@ -148,6 +215,17 @@ export function ControlPanel({
                     <option value="valley">Valley</option>
                     <option value="pipe">Pipe Organ</option>
                 </select>
+
+                <div className={styles.toggleRow}>
+                    <label className={styles.subLabel}>Unique Values (1–N)</label>
+                    <button
+                        className={`${styles.toggleButton} ${uniqueValues ? styles.toggleOn : ''}`}
+                        onClick={() => setUniqueValues(!uniqueValues)}
+                        disabled={isRunning}
+                    >
+                        <span className={styles.toggleKnob} />
+                    </button>
+                </div>
             </div>
 
             {/* Size */}
@@ -157,19 +235,19 @@ export function ControlPanel({
                     <input
                         type="range"
                         className={styles.range}
-                        min="10"
+                        min="2"
                         max="999"
                         value={arraySize}
-                        onChange={(e) => setArraySize(Number(e.target.value))}
+                        onChange={(e) => handleSizeSlider(Number(e.target.value))}
                         disabled={isRunning}
                     />
                     <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         className={styles.sizeInput}
-                        min="10"
-                        max="999"
-                        value={arraySize}
-                        onChange={(e) => handleSizeInput(e.target.value)}
+                        value={sizeText}
+                        onChange={(e) => handleSizeTextChange(e.target.value)}
+                        onBlur={handleSizeTextBlur}
                         disabled={isRunning}
                     />
                 </div>
@@ -181,14 +259,24 @@ export function ControlPanel({
                     Speed
                     <span className={styles.value}>{speed} ops/s</span>
                 </label>
-                <input
-                    type="range"
-                    className={styles.range}
-                    min="1"
-                    max="1000"
-                    value={speed}
-                    onChange={(e) => handleSpeedChange(Number(e.target.value))}
-                />
+                <div className={styles.sizeRow}>
+                    <input
+                        type="range"
+                        className={styles.range}
+                        min="1"
+                        max="1000"
+                        value={speed}
+                        onChange={(e) => handleSpeedSlider(Number(e.target.value))}
+                    />
+                    <input
+                        type="text"
+                        inputMode="numeric"
+                        className={styles.sizeInput}
+                        value={speedText}
+                        onChange={(e) => handleSpeedTextChange(e.target.value)}
+                        onBlur={handleSpeedTextBlur}
+                    />
+                </div>
             </div>
 
             {/* Seed */}
@@ -196,10 +284,12 @@ export function ControlPanel({
                 <label className={styles.label}>Seed</label>
                 <div className={styles.seedRow}>
                     <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         className={styles.seedInput}
-                        value={seed}
-                        onChange={(e) => setSeed(Number(e.target.value))}
+                        value={seedText}
+                        onChange={(e) => handleSeedTextChange(e.target.value)}
+                        onBlur={handleSeedTextBlur}
                         disabled={isRunning}
                     />
                     <button
@@ -218,13 +308,13 @@ export function ControlPanel({
                 </div>
             </div>
 
-            {/* Bar Color (Collapsible) */}
+            {/* Appearance (Collapsible) */}
             <div className={styles.group}>
                 <button
                     className={styles.collapseHeader}
-                    onClick={() => setIsColorCollapsed(!isColorCollapsed)}
+                    onClick={() => setIsAppearanceCollapsed(!isAppearanceCollapsed)}
                 >
-                    <label className={styles.label} style={{ cursor: 'pointer', pointerEvents: 'none' }}>Bar Color</label>
+                    <label className={styles.label} style={{ cursor: 'pointer', pointerEvents: 'none' }}>Appearance</label>
                     <svg
                         width="16"
                         height="16"
@@ -234,23 +324,90 @@ export function ControlPanel({
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        style={{ transform: isColorCollapsed ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.2s' }}
+                        style={{ transform: isAppearanceCollapsed ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.2s' }}
                     >
                         <polyline points="6 9 12 15 18 9" />
                     </svg>
                 </button>
 
-                {!isColorCollapsed && (
-                    <div className={styles.colorRow}>
-                        {COLOR_PRESETS.map((preset) => (
-                            <button
-                                key={preset.value}
-                                className={`${styles.colorSwatch} ${barColor === preset.value ? styles.colorActive : ''}`}
-                                style={{ background: preset.value }}
-                                onClick={() => onColorChange(preset.value)}
-                                title={preset.name}
-                            />
-                        ))}
+                {!isAppearanceCollapsed && (
+                    <div className={styles.appearanceContent}>
+                        <label className={styles.subLabel}>Theme Preset</label>
+                        <div className={styles.themeGrid}>
+                            {THEME_KEYS.map((key) => {
+                                const preset = THEME_PRESETS[key];
+                                const isActive = theme.name === preset.name;
+                                return (
+                                    <button
+                                        key={key}
+                                        className={`${styles.themeSwatch} ${isActive ? styles.themeActive : ''}`}
+                                        onClick={() => handleThemePreset(key)}
+                                        title={preset.name}
+                                    >
+                                        <span
+                                            className={styles.themePreview}
+                                            style={{ background: preset.canvasBackground }}
+                                        >
+                                            <span className={styles.themeBar} style={{ background: preset.barColor, height: '60%' }} />
+                                            <span className={styles.themeBar} style={{ background: preset.compareColor, height: '80%' }} />
+                                            <span className={styles.themeBar} style={{ background: preset.swapColor, height: '45%' }} />
+                                            <span className={styles.themeBar} style={{ background: preset.barColor, height: '70%' }} />
+                                        </span>
+                                        <span className={styles.themeLabel}>{preset.name}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <button
+                            className={styles.detailToggle}
+                            onClick={() => setShowColorDetails(!showColorDetails)}
+                        >
+                            <span>Customize Colors</span>
+                            <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                style={{ transform: showColorDetails ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+                            >
+                                <polyline points="6 9 12 15 18 9" />
+                            </svg>
+                        </button>
+
+                        {showColorDetails && (
+                            <div className={styles.colorFields}>
+                                {COLOR_FIELDS.map(({ key, label }) => (
+                                    <div key={key} className={styles.colorField}>
+                                        <label className={styles.colorFieldLabel}>{label}</label>
+                                        <div className={styles.colorInputGroup}>
+                                            <input
+                                                type="color"
+                                                className={styles.colorPicker}
+                                                value={theme[key]}
+                                                onChange={(e) => handleColorField(key, e.target.value)}
+                                            />
+                                            <input
+                                                type="text"
+                                                className={styles.colorHex}
+                                                value={theme[key]}
+                                                onChange={(e) => {
+                                                    const v = e.target.value;
+                                                    if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+                                                        handleColorField(key, v);
+                                                    }
+                                                }}
+                                                spellCheck={false}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -267,8 +424,6 @@ export function ControlPanel({
                     </button>
                 </div>
             </div>
-
-
 
             {/* Controls */}
             <div className={styles.controls}>
