@@ -1,11 +1,60 @@
 .main {
   min-height: 100vh;
-  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 24px 40px 40px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: background-color 0.3s ease;
+}
+
+.mainVertical {
+  /* background now controlled by theme */
+}
+
+.viewToggle {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+  margin-bottom: 24px;
+  flex-shrink: 0;
+}
+
+.toggleBtn {
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 40px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: transparent;
+  color: #64748b;
+}
+
+.toggleBtn:hover {
+  color: #334155;
+}
+
+.toggleBtnActive {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.mainVertical .viewToggle {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.mainVertical .toggleBtnActive {
+  background: #faf6f0;
+  color: #2d2520;
 }
 
 .container {
@@ -13,6 +62,17 @@
   gap: 32px;
   max-width: 1280px;
   width: 100%;
+  flex: 1;
+  align-items: flex-start;
+}
+
+.verticalLayout {
+  display: flex;
+  gap: 32px;
+  width: 100%;
+  max-width: 1280px;
+  flex: 1;
+  align-items: stretch;
 }
 
 .visualizerSection {
@@ -38,12 +98,12 @@
 }
 
 .canvas {
-  background: #0f172a;
   border-radius: 16px;
   padding: 20px;
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.1),
     0 20px 40px rgba(15, 23, 42, 0.15);
+  transition: background-color 0.3s ease;
 }
 
 .legendBar {
