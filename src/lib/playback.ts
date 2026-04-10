@@ -29,7 +29,7 @@ export function createPlaybackController(): PlaybackController {
     let eventCallbacks: ((event: SortEvent) => void)[] = [];
     let stateCallbacks: ((state: PlaybackState) => void)[] = [];
     let completeCallbacks: ((sortedArray: number[]) => void)[] = [];
-    let speed = 100; // events per second
+    let speed = 200; // events per second
 
     function setState(newState: PlaybackState) {
         state = newState;

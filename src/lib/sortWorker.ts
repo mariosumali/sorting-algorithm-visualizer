@@ -16,6 +16,14 @@ let isPaused = false;
 let isRunning = false;
 let eventsPerSecond = 200;
 
+let loopStartTime = 0;
+let totalSteps = 0;
+
+function resetTiming() {
+    loopStartTime = performance.now();
+    totalSteps = 0;
+}
+
 function emit(event: Omit<SortEvent, 'id'>) {
     const fullEvent = { ...event, id: eventId++ } as SortEvent;
     self.postMessage({ type: 'event', payload: fullEvent });
@@ -33,7 +41,6 @@ self.onmessage = (e: MessageEvent) => {
             isRunning = true;
             eventsPerSecond = speed || 200;
 
-            // Emit start event
             emit({
                 type: 'start',
                 algorithmName: algorithm,
@@ -41,7 +48,6 @@ self.onmessage = (e: MessageEvent) => {
                 seed,
             } as Omit<StartEvent, 'id'>);
 
-            // Get algorithm
             const sortFn = algorithms[algorithm];
             if (!sortFn) {
                 self.postMessage({ type: 'error', payload: `Unknown algorithm: ${algorithm}` });
@@ -51,7 +57,7 @@ self.onmessage = (e: MessageEvent) => {
             const helpers = createHelpers(currentArray, emit);
             generator = sortFn(helpers);
 
-            // Start running
+            resetTiming();
             runLoop();
             break;
         }
@@ -74,6 +80,7 @@ self.onmessage = (e: MessageEvent) => {
         case 'resume': {
             isPaused = false;
             if (isRunning) {
+                resetTiming();
                 runLoop();
             }
             break;
@@ -90,6 +97,7 @@ self.onmessage = (e: MessageEvent) => {
 
         case 'setSpeed': {
             eventsPerSecond = payload;
+            resetTiming();
             break;
         }
     }
@@ -98,26 +106,28 @@ self.onmessage = (e: MessageEvent) => {
 function runLoop() {
     if (!generator || !isRunning || isPaused) return;
 
-    // Calculate how many events to process based on speed
-    // At 60fps, we want eventsPerSecond / 60 events per frame
-    const eventsPerFrame = Math.max(1, Math.ceil(eventsPerSecond / 60));
+    const now = performance.now();
+    const elapsed = now - loopStartTime;
+    const targetSteps = Math.floor(elapsed * eventsPerSecond / 1000);
 
-    // Calculate delay between batches (in ms)
-    // Higher speed = smaller delay
-    const delayMs = Math.max(1, Math.floor(1000 / eventsPerSecond * eventsPerFrame));
+    const maxPerTick = Math.max(1, Math.ceil(eventsPerSecond / 30));
+    let processed = 0;
 
-    let count = 0;
-    while (!isPaused && isRunning && count < eventsPerFrame) {
-        const result = generator.next();
+    while (totalSteps < targetSteps && processed < maxPerTick && !isPaused && isRunning) {
+        const result = generator!.next();
         if (result.done) {
             finish();
             return;
         }
-        count++;
+        totalSteps++;
+        processed++;
     }
 
     if (!isPaused && isRunning) {
-        setTimeout(runLoop, delayMs);
+        const nextStepDue = (totalSteps + 1) * 1000 / eventsPerSecond;
+        const nowElapsed = performance.now() - loopStartTime;
+        const waitMs = Math.max(1, Math.ceil(nextStepDue - nowElapsed));
+        setTimeout(runLoop, waitMs);
     }
 }
 
