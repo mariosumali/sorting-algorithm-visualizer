@@ -5,7 +5,7 @@
  * Each helper automatically emits the corresponding event.
  */
 
-import type { SortEvent, SwapEvent, CompareEvent, WriteEvent, ReadEvent, PivotEvent, PartitionEvent, RangeEvent, MergeEvent, StartEvent, DoneEvent, CheckpointEvent } from './events';
+import type { SortEvent, SwapEvent, CompareEvent, WriteEvent, DeleteEvent, ReadEvent, PivotEvent, PartitionEvent, RangeEvent, MergeEvent, CheckpointEvent, EffectEvent, VisualEffectType } from './events';
 
 export type EmitFn = (event: Omit<SortEvent, 'id'>) => void;
 
@@ -20,6 +20,8 @@ export interface SortHelpers {
     read(i: number): number;
     /** Write value to arr[i]. Emits 'write'. */
     write(i: number, value: number): void;
+    /** Remove element at arr[i] (sets to 0). Emits 'delete'. */
+    delete(i: number): void;
     /** Mark index as pivot. Emits 'pivot'. */
     pivot(i: number): void;
     /** Mark partition range. Emits 'partition'. */
@@ -30,6 +32,8 @@ export interface SortHelpers {
     merge(lo: number, mid: number, hi: number): void;
     /** Emit checkpoint for stepping. */
     checkpoint(label: string): void;
+    /** Emit a visual effect event. */
+    effect(effect: VisualEffectType, opts?: { indices?: number[]; values?: number[]; color?: string; intensity?: number }): void;
     /** Get current array length */
     length: number;
 }
@@ -60,6 +64,11 @@ export function createHelpers(arr: number[], emit: EmitFn): SortHelpers {
             arr[i] = value;
             emit({ type: 'write', index: i, value } as Omit<WriteEvent, 'id'>);
         },
+        delete(i: number): void {
+            const prevValue = arr[i];
+            arr[i] = 0;
+            emit({ type: 'delete', index: i, prevValue } as Omit<DeleteEvent, 'id'>);
+        },
         pivot(i: number): void {
             emit({ type: 'pivot', index: i } as Omit<PivotEvent, 'id'>);
         },
@@ -74,6 +83,9 @@ export function createHelpers(arr: number[], emit: EmitFn): SortHelpers {
         },
         checkpoint(label: string): void {
             emit({ type: 'checkpoint', label } as Omit<CheckpointEvent, 'id'>);
+        },
+        effect(effect: VisualEffectType, opts?: { indices?: number[]; values?: number[]; color?: string; intensity?: number }): void {
+            emit({ type: 'effect', effect, ...opts } as Omit<EffectEvent, 'id'>);
         },
         get length() {
             return arr.length;

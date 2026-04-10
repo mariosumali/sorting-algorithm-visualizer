@@ -5,11 +5,23 @@
  * and the Renderer/Audio engine (consumers).
  */
 
+// --- Effect Type Discriminator ---
+export type VisualEffectType =
+  | 'dust'
+  | 'holyBeam'
+  | 'purgeFlash'
+  | 'redWash'
+  | 'infectGlow'
+  | 'sacrificeFlame'
+  | 'chaosParticles'
+  | 'spotlight';
+
 // --- Event Type Discriminator ---
 export type EventType =
   // Structural (Mutation)
   | 'swap'
   | 'write'
+  | 'delete'
   | 'copy'
   | 'bulkWrite'
   // Read & Comparison
@@ -25,6 +37,8 @@ export type EventType =
   | 'heapify'
   | 'bucket'
   | 'pass'
+  // Visual Effects
+  | 'effect'
   // Lifecycle
   | 'start'
   | 'checkpoint'
@@ -48,6 +62,13 @@ export interface WriteEvent extends BaseEvent {
   type: 'write';
   index: number;
   value: number;
+}
+
+export interface DeleteEvent extends BaseEvent {
+  type: 'delete';
+  index: number;
+  /** The value that was at this index before deletion */
+  prevValue: number;
 }
 
 export interface CopyEvent extends BaseEvent {
@@ -131,6 +152,16 @@ export interface PassEvent extends BaseEvent {
   label?: string;
 }
 
+// --- Visual Effect Events ---
+export interface EffectEvent extends BaseEvent {
+  type: 'effect';
+  effect: VisualEffectType;
+  indices?: number[];
+  values?: number[];
+  color?: string;
+  intensity?: number;
+}
+
 // --- Lifecycle Events ---
 export interface StartEvent extends BaseEvent {
   type: 'start';
@@ -152,6 +183,7 @@ export interface DoneEvent extends BaseEvent {
 export type SortEvent =
   | SwapEvent
   | WriteEvent
+  | DeleteEvent
   | CopyEvent
   | BulkWriteEvent
   | CompareEvent
@@ -165,6 +197,7 @@ export type SortEvent =
   | HeapifyEvent
   | BucketEvent
   | PassEvent
+  | EffectEvent
   | StartEvent
   | CheckpointEvent
   | DoneEvent;
@@ -176,6 +209,7 @@ export function getEventFamily(type: EventType): EventFamily {
   switch (type) {
     case 'swap':
     case 'write':
+    case 'delete':
     case 'copy':
     case 'bulkWrite':
       return 'structural';
@@ -191,6 +225,8 @@ export function getEventFamily(type: EventType): EventFamily {
     case 'heapify':
     case 'bucket':
     case 'pass':
+      return 'marker';
+    case 'effect':
       return 'marker';
     case 'start':
     case 'checkpoint':
